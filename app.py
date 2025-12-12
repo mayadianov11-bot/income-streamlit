@@ -3,6 +3,71 @@ import pandas as pd
 import joblib
 
 st.set_page_config(page_title="Прогноз дохода", layout="centered")
+st.markdown("""
+<style>
+
+    /* Делаем все белые блоки прозрачными */
+    .stApp, .block-container, .main,
+    [data-testid="stHeader"], [data-testid="stSidebar"] {
+        background: transparent !important;
+    }
+
+    /* ТЁМНЫЙ СПОКОЙНЫЙ ПЕРЕЛИВАЮЩИЙСЯ ФОН */
+    html, body {
+        height: 100%;
+        background: linear-gradient(
+            120deg,
+            #676767,   /* глубокий тёмно-синий */
+            #bebeaf,   /* холодный серо-синий */
+            #334155,   /* мягкий графит */
+            #164e63,   /* тёмная бирюза */
+            #312e81,   /* глубокий фиолетовый */
+            #676767    /* возврат */
+        ) !important;
+
+        background-size: 300% 300% !important;
+        animation: darkFlow 18s ease-in-out infinite !important;
+    }
+
+    @keyframes darkFlow {
+        0%   {background-position: 0% 50%;}
+        50%  {background-position: 100% 50%;}
+        100% {background-position: 0% 50%;}
+    }
+
+</style>
+""", unsafe_allow_html=True)
+st.markdown("""
+<style>
+
+    /* ====== СКАНИРУЮЩАЯ ЛИНИЯ ====== */
+
+    .scanline {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 3px;  /* толщина линии */
+        background: linear-gradient(
+            to right,
+            transparent,
+            rgba(255, 255, 255, 0.8),
+            transparent
+        );
+        animation: scanMove 10s linear infinite;
+        z-index: 9999; /* поверх всего */
+        pointer-events: none;
+    }
+
+    @keyframes scanMove {
+        0%   { top: 0%; }
+        100% { top: 100%; }
+    }
+
+</style>
+
+<div class="scanline"></div>
+""", unsafe_allow_html=True)
 
 # Загружаем модель
 model = joblib.load("model.pkl")
@@ -221,8 +286,59 @@ st.markdown("---")
 # ============================================================
 
 if st.button("Предсказать доход"):
+    # ============================================================
+    #       АНИМАЦИЯ: "НЕЙРОСЕТЬ ДУМАЕТ" + ПРОГРЕСС-БАР
+    # ============================================================
 
-    # 1. Числа
+    import time
+    import random
+
+    # создаём контейнер, куда вставим анимацию
+    thinking_box = st.empty()
+    progress_placeholder = st.empty()
+
+    # ----------- HTML-блок "Нейросеть думает" -----------
+    thinking_html = """
+        <style>
+        @keyframes thinkingGlow {
+            0% {opacity: 0.4;}
+            50% {opacity: 1;}
+            100% {opacity: 0.4;}
+        }
+        .thinking-box {
+            font-size: 18px;
+            background-color: #111827;
+            color: #cbd5e1;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #374151;
+            text-align: center;
+            margin-top: 10px;
+            animation: thinkingGlow 2s infinite ease-in-out;
+        }
+        </style>
+
+        <div class="thinking-box">
+            Модель думает... анализирует… сверяет вероятности…
+            <br>
+            Это займёт несколько секунд.
+        </div>
+    """
+
+    thinking_box.markdown(thinking_html, unsafe_allow_html=True)
+
+    # ----------- Прогресс-бар -----------
+    progress_text = "Обработка данных…"
+    my_bar = progress_placeholder.progress(0, text=progress_text)
+
+    for percent in range(1, 101):
+        time.sleep(random.uniform(0.03, 0.06))
+        my_bar.progress(percent, text=progress_text)
+
+    # ----------- УБИРАЕМ АНИМАЦИЮ ПОСЛЕ ЗАГРУЗКИ -----------
+    thinking_box.empty()
+    progress_placeholder.empty()
+    # 1. Числовые признаки
     data_input = {
         "age": age,
         "fnlwgt": fnlwgt,
@@ -232,7 +348,7 @@ if st.button("Предсказать доход"):
         "hours-per-week": hours_per_week,
     }
 
-    # 2. Дамми
+    # 2. Дамми-признаки
     dummy_columns = [
         'workclass_Local-gov','workclass_Private','workclass_Self-emp-inc',
         'workclass_Self-emp-not-inc','workclass_State-gov','workclass_Without-pay',
@@ -283,33 +399,66 @@ if st.button("Предсказать доход"):
     pred = model.predict(X_input)[0]
     prob = model.predict_proba(X_input)[0][1]
 
-    # ---------- ПРЕДСКАЗАНИЕ ----------
-    st.subheader("Результат прогноза")
-
-    pred = model.predict(X_input)[0]
-    prob = model.predict_proba(X_input)[0][1]
-
-    # ---------- CSS для анимации ----------
+    # ==========================
+    # CSS: дождь денег / дождь слёз
+    # ==========================
     st.markdown(
         """
         <style>
-        @keyframes fadeSlide {
-            0% {opacity: 0; transform: translateY(20px);}
-            100% {opacity: 1; transform: translateY(0);}
+
+        /* Анимация падения */
+        @keyframes fall {
+            0% { transform: translateY(-100px) rotate(0deg); opacity: 0; }
+            20% { opacity: 1; }
+            100% { transform: translateY(110vh) rotate(360deg); opacity: 0; }
         }
-        .result-card {
-            animation: fadeSlide 0.8s ease-out forwards;
+
+        .falling-item {
+            position: fixed;
+            top: -50px;
+            left: 0;
+            font-size: 40px;
+            pointer-events: none;
+            z-index: 9999;
+            animation: fall linear infinite;
         }
+
         </style>
         """,
         unsafe_allow_html=True
     )
 
-    # Если доход > 50K
+    import random
+
+    def generate_falling_items(icons, count=30):
+        html = ""
+        for _ in range(count):
+            icon = random.choice(icons)
+            left = random.randint(0, 100)
+            duration = random.uniform(2, 4)
+            delay = random.uniform(0, 2)
+            html += f"""
+            <div class="falling-item" style="
+                left: {left}%;
+                animation-duration: {duration}s;
+                animation-delay: {delay}s;
+            ">{icon}</div>
+            """
+        return html
+
+    # ==========================
+    #  КАРТОЧКИ + ЭФФЕКТЫ
+    # ==========================
+    st.subheader("Результат прогноза")
+
+    # ---- ДОХОД ВЫШЕ 50K ----
     if pred == 1:
+        effects = generate_falling_items(["💸", "💵", "🤑"], 35)
+        st.markdown(effects, unsafe_allow_html=True)
+
         st.markdown(
             f"""
-            <div class="result-card" style="
+            <div style="
                 padding: 20px;
                 border-radius: 12px;
                 background-color: #0f3d21;
@@ -328,11 +477,14 @@ if st.button("Предсказать доход"):
             unsafe_allow_html=True
         )
 
-    # Если доход ≤ 50K
+    # ---- ДОХОД НИЖЕ 50K ----
     else:
+        effects = generate_falling_items(["💧", "😢", "🌧️"], 35)
+        st.markdown(effects, unsafe_allow_html=True)
+
         st.markdown(
             f"""
-            <div class="result-card" style="
+            <div style="
                 padding: 20px;
                 border-radius: 12px;
                 background-color: #3a0d0d;
@@ -350,3 +502,52 @@ if st.button("Предсказать доход"):
             """,
             unsafe_allow_html=True
         )
+
+    # ============================================================
+    #          ФИНАНСОВАЯ МУДРОСТЬ ДНЯ (адаптивная)
+    # ============================================================
+
+    import random
+
+    # --- Мудрости для высокого дохода (>50K) ---
+    wisdom_rich = [
+        "Настоящее богатство — в том, чтобы деньги работали на тебя.",
+        "Ваши результаты показывают, что дисциплина приносит прибыль.",
+        "Успех любит тех, кто инвестирует не только средства, но и время.",
+        "Большие доходы начинаются с маленьких правильных решений.",
+        "Вы на правильном пути — теперь главное сохранять темп."
+    ]
+
+    # --- Мудрости для дохода ≤ 50K ---
+    wisdom_norm = [
+        "Даже маленький шаг в сторону финансовой стабильности — уже движение.",
+        "Доход не определяет ценность — он лишь отражает этап пути.",
+        "Финансовая свобода начинается с одного небольшого изменения.",
+        "Не важно, сколько вы зарабатываете сейчас — важно, куда движетесь.",
+        "Маленькие системные привычки со временем превращаются в большие результаты."
+    ]
+
+    # Выбор мудрости по результату
+    chosen_wisdom = random.choice(wisdom_rich if pred == 1 else wisdom_norm)
+
+    # Красивый блок мудрости
+    st.markdown(
+        f"""
+        <div style="
+            margin-top: 30px;
+            padding: 18px;
+            background-color: #1f1f1f;
+            color: #e8e8e8;
+            border-left: 4px solid {'#4ade80' if pred==1 else '#ff6b6b'};
+            border-radius: 8px;
+            font-size: 17px;
+            opacity: 0.95;
+            line-height: 1.5;
+            animation: fadeSlide 0.8s ease-out forwards;
+        ">
+            <b>Финансовая мудрость дня:</b><br>
+            {chosen_wisdom}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
